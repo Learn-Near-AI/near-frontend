@@ -18,9 +18,18 @@ import {
   Menu,
   X,
   Sun,
-  Moon
+  Moon,
+  ChevronDown,
+  LogOut
 } from 'lucide-react'
 import ExamplesBrowser from './components/ExamplesBrowser'
+import {
+  initWalletSelector,
+  openWalletSelectorModal,
+  getActiveAccountId,
+  getActiveAccountBalance,
+  disconnectWallet,
+} from './near/near'
 
 function App() {
   const [currentPath, setCurrentPath] = useState(() => window.location.pathname || '/')
@@ -30,6 +39,9 @@ function App() {
     const saved = localStorage.getItem('theme')
     return saved ? saved === 'dark' : true
   })
+  const [walletAccountId, setWalletAccountId] = useState(null)
+  const [walletBalance, setWalletBalance] = useState(null)
+  const [walletDropdownOpen, setWalletDropdownOpen] = useState(false)
 
   useEffect(() => {
     // Initialize AOS
@@ -48,6 +60,37 @@ function App() {
     }
   }, [isDark])
 
+  // Initialize Wallet Selector (Meteor) and keep active account + balance in sync
+  useEffect(() => {
+    ;(async () => {
+      try {
+        await initWalletSelector()
+
+        const updateAccountState = async () => {
+          const accountId = await getActiveAccountId()
+          if (!accountId) {
+            setWalletAccountId(null)
+            setWalletBalance(null)
+            return
+          }
+          setWalletAccountId(accountId)
+          const balance = await getActiveAccountBalance()
+          if (balance !== null) {
+            setWalletBalance(balance)
+          }
+        }
+
+        // Initial fetch
+        await updateAccountState()
+        // Poll periodically so state updates after user connects via modal
+        const intervalId = setInterval(updateAccountState, 5000)
+        return () => clearInterval(intervalId)
+      } catch (e) {
+        console.error('Failed to init wallet selector', e)
+      }
+    })()
+  }, [])
+
   useEffect(() => {
     const handlePopState = () => {
       setCurrentPath(window.location.pathname || '/')
@@ -56,6 +99,17 @@ function App() {
     window.addEventListener('popstate', handlePopState)
     return () => window.removeEventListener('popstate', handlePopState)
   }, [])
+
+  // Close wallet dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (walletDropdownOpen && !event.target.closest('.wallet-dropdown-container')) {
+        setWalletDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [walletDropdownOpen])
 
   const navigate = (path) => {
     if (path === currentPath) return
@@ -82,6 +136,18 @@ function App() {
 
   const launchExamplesBrowser = () => {
     navigate('/examples')
+  }
+
+  const handleWalletConnect = async () => {
+    await initWalletSelector()
+    openWalletSelectorModal()
+  }
+
+  const handleWalletDisconnect = async () => {
+    await disconnectWallet()
+    setWalletAccountId(null)
+    setWalletBalance(null)
+    setWalletDropdownOpen(false)
   }
 
   return (
@@ -151,12 +217,73 @@ function App() {
                 )}
               </button>
 
-              <button
-                onClick={launchExamplesBrowser}
-                className="hidden md:inline-flex items-center justify-center px-6 py-2 text-sm font-semibold text-near-darker bg-near-primary hover:bg-[#00D689] rounded-lg transition-all duration-200"
-              >
-                Launch App
-              </button>
+              {/* NEAR Wallet connect – only show in examples view */}
+              {currentPath === '/examples' && (
+                <div className="hidden md:block relative wallet-dropdown-container">
+                  {walletAccountId ? (
+                    <>
+                      <button
+                        onClick={() => setWalletDropdownOpen(!walletDropdownOpen)}
+                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-near-dark text-gray-800 dark:text-gray-100 hover:border-near-primary hover:text-near-primary transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="text-left">
+                            <div className="font-mono text-xs text-gray-600 dark:text-gray-400">
+                              {walletAccountId}
+                            </div>
+                            <div className="text-xs font-semibold text-near-primary">
+                              {walletBalance ? `${walletBalance} Ⓝ` : 'Loading…'}
+                            </div>
+                          </div>
+                        </div>
+                        <ChevronDown className={`h-4 w-4 transition-transform ${walletDropdownOpen ? 'rotate-180' : ''}`} />
+                      </button>
+                      {walletDropdownOpen && (
+                        <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-near-dark rounded-lg border border-gray-200 dark:border-gray-700 shadow-lg z-50">
+                          <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                            <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Account</div>
+                            <div className="font-mono text-sm text-gray-900 dark:text-white break-all">
+                              {walletAccountId}
+                            </div>
+                          </div>
+                          <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                            <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Balance</div>
+                            <div className="text-lg font-semibold text-near-primary">
+                              {walletBalance ? `${walletBalance} Ⓝ` : 'Loading…'}
+                            </div>
+                          </div>
+                          <div className="p-2">
+                            <button
+                              onClick={handleWalletDisconnect}
+                              className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                            >
+                              <LogOut className="h-4 w-4" />
+                              Disconnect Wallet
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <button
+                      onClick={handleWalletConnect}
+                      className="inline-flex items-center px-4 py-2 text-sm font-semibold rounded-lg border border-gray-300 dark:border-gray-700 text-gray-800 dark:text-gray-100 hover:border-near-primary hover:text-near-primary transition-colors"
+                    >
+                      Connect NEAR Wallet
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Launch App – hide on examples view */}
+              {currentPath !== '/examples' && (
+                <button
+                  onClick={launchExamplesBrowser}
+                  className="hidden md:inline-flex items-center justify-center px-6 py-2 text-sm font-semibold text-near-darker bg-near-primary hover:bg-[#00D689] rounded-lg transition-all duration-200"
+                >
+                  Launch App
+                </button>
+              )}
               
               {/* Mobile menu button */}
               <button

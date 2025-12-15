@@ -1,12 +1,222 @@
-import React, { useState } from 'react'
-import { ArrowLeft, Code2, Play, Rocket, ExternalLink, TimerResetIcon, CopyIcon } from 'lucide-react'
-import { difficultyColors, languageIcons } from '../data/examples'
+import React, { useState, useEffect } from 'react'
+import { ArrowLeft, Code2, Play, Rocket, ExternalLink, TimerResetIcon, CopyIcon, Loader2 } from 'lucide-react'
+import { difficultyColors, languageIcons, exampleCode } from '../data/examples'
+import { initWalletSelector, getActiveAccountId, getNearConfig } from '../near/near'
+import { Buffer } from 'buffer'
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
 function ExampleDetail({ example, onBack }) {
   const difficultyClass = difficultyColors[example.difficulty] || difficultyColors['Beginner']
   const [activeLanguage, setActiveLanguage] = useState(example.language || 'Rust')
   const languageIcon = languageIcons[activeLanguage] || '📄'
-  const [activeInfoTab, setActiveInfoTab] = useState('ai') // 'explanation' | 'ai' | 'output' | 'tests'
+  const [activeInfoTab, setActiveInfoTab] = useState('ai')
+  const [code, setCode] = useState('')
+  const [consoleOutput, setConsoleOutput] = useState('')
+  const [isRunning, setIsRunning] = useState(false)
+  const [isDeploying, setIsDeploying] = useState(false)
+  const [deployedContractId, setDeployedContractId] = useState(null)
+  const [deploymentTxHash, setDeploymentTxHash] = useState(null)
+
+  const initialCode =
+    exampleCode[example.id]?.[activeLanguage] ||
+    `// No ${activeLanguage} code sample is available yet for "${example.name}".
+// Try switching language tabs, or pick another example from the sidebar.`
+
+  useEffect(() => {
+    setCode(initialCode)
+  }, [example.id, activeLanguage, initialCode])
+
+  const addConsoleOutput = (message) => {
+    setConsoleOutput((prev) => prev + message + '\n')
+  }
+
+  const clearConsole = () => {
+    setConsoleOutput('')
+  }
+
+  const handleRun = async () => {
+    if (!code.trim()) {
+      addConsoleOutput('❌ Error: No code to run')
+      return
+    }
+
+    setIsRunning(true)
+    clearConsole()
+    addConsoleOutput('▶ Compiling contract...')
+
+    try {
+      // Compile contract
+      const compileResponse = await fetch(`${API_BASE_URL}/api/compile`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, language: activeLanguage }),
+      })
+
+      const compileResult = await compileResponse.json()
+
+      if (!compileResponse.ok) {
+        throw new Error(compileResult.error || 'Compilation failed')
+      }
+
+      addConsoleOutput('✓ Contract compiled successfully')
+      addConsoleOutput(`✓ WASM size: ${(compileResult.size / 1024).toFixed(2)} KB`)
+
+      // For now, just show compilation success
+      // In a full implementation, you'd deploy to a sandbox and call methods
+      addConsoleOutput('\n💡 Note: Full execution requires deployment.')
+      addConsoleOutput('   Click "Deploy" to deploy and test your contract on TestNet.')
+
+    } catch (error) {
+      addConsoleOutput(`❌ Error: ${error.message}`)
+      console.error('Run error:', error)
+    } finally {
+      setIsRunning(false)
+    }
+  }
+
+  const handleDeploy = async () => {
+    if (!code.trim()) {
+      addConsoleOutput('❌ Error: No code to deploy')
+      return
+    }
+
+    const accountId = await getActiveAccountId()
+    if (!accountId) {
+      addConsoleOutput('❌ Error: Please connect your wallet first')
+      return
+    }
+
+    setIsDeploying(true)
+    clearConsole()
+    addConsoleOutput('▶ Starting deployment process...')
+    addConsoleOutput('▶ Compiling contract...')
+
+    try {
+      // Compile contract
+      const compileResponse = await fetch(`${API_BASE_URL}/api/compile`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, language: activeLanguage }),
+      })
+
+      const compileResult = await compileResponse.json()
+
+      if (!compileResponse.ok) {
+        throw new Error(compileResult.error || 'Compilation failed')
+      }
+
+      addConsoleOutput('✓ Contract compiled successfully')
+      addConsoleOutput(`✓ WASM size: ${(compileResult.size / 1024).toFixed(2)} KB`)
+
+      // Get wallet selector
+      const selector = await initWalletSelector()
+      const wallet = await selector.wallet()
+      const accountId = await getActiveAccountId()
+
+      if (!accountId) {
+        throw new Error('Please connect your wallet first')
+      }
+
+      // Generate subaccount ID (e.g., hello-world-1234567890.testnet)
+      const timestamp = Date.now()
+      const subaccountName = `${example.id}-${timestamp}`
+      const contractId = `${subaccountName}.${accountId.split('.')[1] || 'testnet'}`
+
+      addConsoleOutput(`▶ Deploying to: ${contractId}`)
+      addConsoleOutput('▶ Preparing deployment transaction...')
+
+      const wasmBuffer = Buffer.from(compileResult.wasm, 'base64')
+      const wasmUint8Array = Array.from(new Uint8Array(wasmBuffer))
+
+      // Check if account exists
+      const { nodeUrl } = getNearConfig()
+      
+      let accountExists = false
+      try {
+        const checkRes = await fetch(nodeUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 'dontcare',
+            method: 'query',
+            params: {
+              request_type: 'view_account',
+              finality: 'final',
+              account_id: contractId,
+            },
+          }),
+        })
+        const checkJson = await checkRes.json()
+        accountExists = !checkJson.error && checkJson.result
+      } catch (e) {
+        // Account doesn't exist, we'll deploy to it anyway
+        accountExists = false
+      }
+
+      if (!accountExists) {
+        addConsoleOutput(`ℹ️  Account ${contractId} will be created during deployment`)
+        addConsoleOutput('   (Subaccount creation requires parent account balance)')
+      }
+
+      addConsoleOutput('▶ Uploading WASM contract...')
+      addConsoleOutput('▶ Waiting for wallet approval...')
+
+      // Import near-api-js for transaction building
+      const { transactions, utils } = await import('near-api-js')
+      
+      // Build deploy contract action
+      const deployAction = transactions.deployContract(wasmUint8Array)
+
+      // For simplicity, deploy to user's account
+      // (Subaccount creation requires additional transactions)
+      const targetAccountId = accountExists ? contractId : accountId
+      
+      if (!accountExists) {
+        addConsoleOutput(`ℹ️  Deploying to your account: ${targetAccountId}`)
+        addConsoleOutput('   (To deploy to subaccount, create it first)')
+      }
+
+      // Sign and send transaction via Wallet Selector
+      const deployResult = await wallet.signAndSendTransaction({
+        signerId: accountId,
+        receiverId: targetAccountId,
+        actions: [deployAction],
+      })
+
+      addConsoleOutput('✓ Contract deployed successfully!')
+      
+      // Extract transaction hash
+      const txHash = deployResult?.transaction?.hash || 
+                    deployResult?.transactionHash ||
+                    deployResult?.receipts_outcome?.[0]?.id ||
+                    'pending'
+
+      addConsoleOutput(`✓ Transaction hash: ${txHash}`)
+      addConsoleOutput(`✓ Contract available at: ${targetAccountId}`)
+
+      setDeployedContractId(targetAccountId)
+      setDeploymentTxHash(txHash)
+
+    } catch (error) {
+      addConsoleOutput(`❌ Error: ${error.message}`)
+      console.error('Deploy error:', error)
+    } finally {
+      setIsDeploying(false)
+    }
+  }
+
+  const handleCopyCode = () => {
+    navigator.clipboard.writeText(code)
+  }
+
+  const handleResetCode = () => {
+    if (confirm('Reset code to original example?')) {
+      setCode(initialCode)
+      clearConsole()
+    }
+  }
 
   return (
     <div className="pl-4 py-6 md:py-4 max-w-5xl mx-auto space-y-6 ">
@@ -84,40 +294,69 @@ function ExampleDetail({ example, onBack }) {
             <div className="flex-1" />
 
             {/* Action buttons */}
-            <button  className="px-2.5 md:px-3 py-1.5 text-[0.65rem] md:text-xs border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800">
+            <button
+              onClick={handleResetCode}
+              className="px-2.5 md:px-3 py-1.5 text-[0.65rem] md:text-xs border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
+              title="Reset code"
+            >
               <TimerResetIcon className='h-4 w-4'/>
             </button>
-            <button className="px-2.5 md:px-3 py-1.5 text-[0.65rem] md:text-xs border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800">
+            <button
+              onClick={handleCopyCode}
+              className="px-2.5 md:px-3 py-1.5 text-[0.65rem] md:text-xs border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
+              title="Copy code"
+            >
               <CopyIcon className='h-4 w-4'/>
             </button>
-            <button className="px-2.5 md:px-3 py-1.5 text-[0.65rem] md:text-xs bg-near-primary hover:bg-[#00D689] text-near-darker font-semibold rounded-lg inline-flex items-center gap-1">
-              <Play className="h-4 w-4" />
-              Run
+            <button
+              onClick={handleRun}
+              disabled={isRunning || isDeploying}
+              className="px-2.5 md:px-3 py-1.5 text-[0.65rem] md:text-xs bg-near-primary hover:bg-[#00D689] text-near-darker font-semibold rounded-lg inline-flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isRunning ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Compiling...
+                </>
+              ) : (
+                <>
+                  <Play className="h-4 w-4" />
+                  Run
+                </>
+              )}
             </button>
-            <button className="px-2.5 md:px-3 py-1.5 text-[0.65rem] md:text-xs border border-gray-300 dark:border-gray-600 rounded-lg text-gray-800 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-800 inline-flex items-center gap-1">
-              <Rocket className="h-4 w-4" />
-              Deploy
+            <button
+              onClick={handleDeploy}
+              disabled={isRunning || isDeploying}
+              className="px-2.5 md:px-3 py-1.5 text-[0.65rem] md:text-xs border border-gray-300 dark:border-gray-600 rounded-lg text-gray-800 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-800 inline-flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isDeploying ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Deploying...
+                </>
+              ) : (
+                <>
+                  <Rocket className="h-4 w-4" />
+                  Deploy
+                </>
+              )}
             </button>
           </div>
 
           {/* Code editor area */}
           <div className="flex-1 bg-[#020617] text-gray-100 font-mono text-xs md:text-sm overflow-auto p-4 space-y-3">
             <div className="flex items-center justify-between text-[0.65rem] text-gray-400">
-              <span>Editor (simulated) – connect Monaco/CodeMirror here</span>
-                <span>{activeLanguage} • NEAR SDK</span>
+              <span>Code Editor • {activeLanguage}</span>
+              <span>NEAR SDK</span>
             </div>
-            <pre className="whitespace-pre overflow-x-auto">
-{`1  // ${example.name} example
-2  // TODO: Integrate real Monaco/CodeMirror editor here
-3  // with NEAR SDK auto-complete, error underlining, etc.
-4
-5  #[near_bindgen]
-6  impl Contract {
-7      pub fn hello_world(&self) -> String {
-8          "Hello, NEAR!".to_string()
-9      }
-10 }`}
-            </pre>
+            <textarea
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              className="w-full h-full bg-transparent text-gray-100 font-mono text-xs md:text-sm outline-none resize-none whitespace-pre overflow-x-auto"
+              spellCheck={false}
+              style={{ minHeight: '300px' }}
+            />
           </div>
 
           {/* Bottom status bar */}
@@ -151,10 +390,10 @@ function ExampleDetail({ example, onBack }) {
             })}
           </div>
 
-          <div className="flex-1 p-4 overflow-auto text-sm space-y-4">
+          <div className="flex-1 p-4 text-sm flex flex-col">
             {/* Explanation Tab */}
             {activeInfoTab === 'explanation' && (
-              <div className="space-y-4">
+              <div className="space-y-4 flex-1 overflow-auto">
                 <div>
                   <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-1">
                     {example.name}
@@ -201,8 +440,8 @@ function ExampleDetail({ example, onBack }) {
 
             {/* AI Assistant Tab */}
             {activeInfoTab === 'ai' && (
-              <div className="space-y-4">
-                <div className="bg-gray-50 dark:bg-near-darker rounded-lg p-3 text-xs text-gray-600 dark:text-gray-300 space-y-2">
+              <div className="flex flex-col flex-1 gap-4">
+                <div className="bg-gray-50 dark:bg-near-darker rounded-lg p-3 text-xs text-gray-600 dark:text-gray-300 space-y-2 flex-1 overflow-auto">
                   <p className="font-semibold mb-2">Ask about this code...</p>
                   <div className="space-y-1">
                     <p className="text-gray-500 dark:text-gray-400">Suggested questions:</p>
@@ -214,7 +453,7 @@ function ExampleDetail({ example, onBack }) {
                   </div>
                 </div>
 
-                {/* Chat input (static UI placeholder) */}
+                {/* Chat input (static UI placeholder) fixed at bottom */}
                 <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-2 flex flex-col gap-2 bg-white dark:bg-near-dark">
                   <textarea
                     rows={3}
@@ -241,18 +480,8 @@ function ExampleDetail({ example, onBack }) {
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
               Console Output
             </h3>
-            <div className="bg-gray-50 dark:bg-near-darker rounded-lg p-3 text-[0.7rem] font-mono text-gray-800 dark:text-gray-100 max-h-60 overflow-auto">
-{`▶ Running contract...
-
-✓ Contract compiled
-✓ Deployed to sandbox
-✓ Calling hello_world()
-
-Output:
-"Hello, NEAR!"
-
-Gas used: 2.4 TGas
-Status: Success ✓`}
+            <div className="bg-gray-50 dark:bg-near-darker rounded-lg p-3 text-[0.7rem] font-mono text-gray-800 dark:text-gray-100 max-h-60 overflow-auto whitespace-pre-wrap">
+              {consoleOutput || 'Console output will appear here when you run or deploy...'}
             </div>
           </div>
 
@@ -262,40 +491,44 @@ Status: Success ✓`}
               Deployment
             </h3>
             <div className="text-xs text-gray-600 dark:text-gray-300 space-y-1">
-              <p>
-                Status:{' '}
-                <span className="inline-flex items-center gap-1 text-green-500 font-semibold">
-                  <span className="w-2 h-2 rounded-full bg-green-500" />
-                  Deployed to TestNet
-                </span>
-              </p>
-              <p>
-                Contract ID:{' '}
-                <span className="font-mono text-[0.7rem] text-gray-800 dark:text-gray-100">
-                  example-contract.testnet
-                </span>
-              </p>
-              <p>
-                Tx Hash:{' '}
-                <span className="font-mono text-[0.7rem] text-gray-800 dark:text-gray-100">
-                  4g7...abc123
-                </span>
-              </p>
-              <p>
-                Deployment cost:{' '}
-                <span className="font-semibold text-gray-800 dark:text-gray-100">
-                  ~0.2 Ⓝ (est.)
-                </span>
-              </p>
-              <a
-                href="https://explorer.testnet.near.org"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-xs text-near-primary hover:text-[#00D689]"
-              >
-                <ExternalLink className="h-3 w-3" />
-                View on Explorer
-              </a>
+              {deployedContractId ? (
+                <>
+                  <p>
+                    Status:{' '}
+                    <span className="inline-flex items-center gap-1 text-green-500 font-semibold">
+                      <span className="w-2 h-2 rounded-full bg-green-500" />
+                      Deployed to TestNet
+                    </span>
+                  </p>
+                  <p>
+                    Contract ID:{' '}
+                    <span className="font-mono text-[0.7rem] text-gray-800 dark:text-gray-100">
+                      {deployedContractId}
+                    </span>
+                  </p>
+                  {deploymentTxHash && (
+                    <p>
+                      Tx Hash:{' '}
+                      <span className="font-mono text-[0.7rem] text-gray-800 dark:text-gray-100">
+                        {deploymentTxHash}
+                      </span>
+                    </p>
+                  )}
+                  <a
+                    href={`https://explorer.testnet.near.org/accounts/${deployedContractId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-near-primary hover:text-[#00D689]"
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                    View on Explorer
+                  </a>
+                </>
+              ) : (
+                <p className="text-gray-500 dark:text-gray-400">
+                  No contract deployed yet. Click "Deploy" to deploy your contract.
+                </p>
+              )}
             </div>
           </div>
         </div>

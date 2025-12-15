@@ -23,3 +23,12 @@ dist-ssr
 *.sln
 *.sw?
 
+# Build artifacts
+temp-builds/
+*.wasm
+out/
+
+# Environment variables
+.env
+.env.local
+.env.production

@@ -1,5 +1,5 @@
 export const examplesData = {
-  'Basics': [
+  Basics: [
     { id: 'hello-world', name: 'Hello World', difficulty: 'Beginner', language: 'Rust' },
     { id: 'storage-basics', name: 'Storage Basics', difficulty: 'Beginner', language: 'Rust' },
     { id: 'state-management', name: 'State Management', difficulty: 'Beginner', language: 'Rust' },
@@ -23,7 +23,7 @@ export const examplesData = {
     { id: 'ft-callbacks', name: 'FT Callbacks', difficulty: 'Advanced', language: 'Rust' },
     { id: 'ft-batch', name: 'Batch Operations', difficulty: 'Advanced', language: 'Rust' },
   ],
-  'NFTs': [
+  NFTs: [
     { id: 'nft-standard', name: 'NFT Standard', difficulty: 'Intermediate', language: 'Rust' },
     { id: 'nft-metadata', name: 'NFT Metadata', difficulty: 'Intermediate', language: 'Rust' },
     { id: 'nft-minting', name: 'NFT Minting', difficulty: 'Intermediate', language: 'Rust' },
@@ -53,7 +53,7 @@ export const examplesData = {
     { id: 'cross-chain-auth', name: 'Cross-Chain Auth', difficulty: 'Advanced', language: 'Rust' },
     { id: 'signature-callbacks', name: 'Signature Callbacks', difficulty: 'Advanced', language: 'Rust' },
   ],
-  'Indexing': [
+  Indexing: [
     { id: 'queryapi-basics', name: 'QueryAPI Basics', difficulty: 'Intermediate', language: 'JS' },
     { id: 'indexer-setup', name: 'Indexer Setup', difficulty: 'Intermediate', language: 'JS' },
     { id: 'data-indexing', name: 'Data Indexing', difficulty: 'Intermediate', language: 'JS' },
@@ -94,6 +94,621 @@ export const difficultyColors = {
 export const languageIcons = {
   'Rust': '⚽',
   'JS': '📜',
+  'JavaScript': '📜',
   'TS': '📘',
+  'TypeScript': '📘',
+}
+
+// Real, minimal NEAR contract code for each example & language.
+// These are valid patterns you can copy into a real NEAR project.
+export const exampleCode = {
+  'hello-world': {
+    Rust: `use near_sdk::near_bindgen;
+
+#[near_bindgen]
+#[derive(Default)]
+pub struct Contract {}
+
+#[near_bindgen]
+impl Contract {
+    pub fn hello_world(&self) -> String {
+        "Hello, NEAR!".to_string()
+    }
+}`,
+    JavaScript: `// near-sdk-js hello world (JavaScript)
+import { NearBindgen, view } from "near-sdk-js";
+
+@NearBindgen({})
+class Contract {
+  @view({})
+  hello_world() {
+    return "Hello, NEAR!";
+  }
+}
+
+export default Contract;`,
+    TypeScript: `// near-sdk-js hello world (TypeScript)
+import { NearBindgen, view } from "near-sdk-js";
+
+@NearBindgen({})
+export class Contract {
+  @view({})
+  hello_world(): string {
+    return "Hello, NEAR!";
+  }
+}`,
+  },
+  'storage-basics': {
+    Rust: `use near_sdk::{near_bindgen, BorshStorageKey};
+use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
+
+#[near_bindgen]
+#[derive(BorshDeserialize, BorshSerialize)]
+pub struct Contract {
+    message: String,
+}
+
+impl Default for Contract {
+    fn default() -> Self {
+        Self {
+            message: "Hello, NEAR storage!".to_string(),
+        }
+    }
+}
+
+#[near_bindgen]
+impl Contract {
+    pub fn set_message(&mut self, message: String) {
+        self.message = message;
+    }
+
+    pub fn get_message(&self) -> String {
+        self.message.clone()
+    }
+}`,
+    JavaScript: `// near-sdk-js storage basics (JavaScript)
+import { NearBindgen, view, call, near } from "near-sdk-js";
+
+@NearBindgen({})
+class Contract {
+  constructor({ message } = { message: "Hello, NEAR storage!" }) {
+    this.message = message;
+  }
+
+  @view({})
+  get_message() {
+    return this.message;
+  }
+
+  @call({})
+  set_message({ message }) {
+    near.log(\`Updating message to: \${message}\`);
+    this.message = message;
+  }
+}
+
+export default Contract;`,
+    TypeScript: `// near-sdk-js storage basics (TypeScript)
+import { NearBindgen, view, call, near } from "near-sdk-js";
+
+@NearBindgen({})
+export class Contract {
+  message: string = "Hello, NEAR storage!";
+
+  @view({})
+  get_message(): string {
+    return this.message;
+  }
+
+  @call({})
+  set_message({ message }: { message: string }): void {
+    near.log(\`Updating message to: \${message}\`);
+    this.message = message;
+  }
+}`,
+  },
+  'state-management': {
+    Rust: `use near_sdk::near_bindgen;
+use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
+
+#[near_bindgen]
+#[derive(BorshDeserialize, BorshSerialize)]
+pub struct Contract {
+    counter: u64,
+}
+
+impl Default for Contract {
+    fn default() -> Self {
+        Self { counter: 0 }
+    }
+}
+
+#[near_bindgen]
+impl Contract {
+    pub fn increment(&mut self) {
+        self.counter += 1;
+    }
+
+    pub fn get_counter(&self) -> u64 {
+        self.counter
+    }
+}`,
+    JavaScript: `// near-sdk-js state management (JavaScript)
+import { NearBindgen, view, call } from "near-sdk-js";
+
+@NearBindgen({})
+class Contract {
+  constructor({ counter } = { counter: 0 }) {
+    this.counter = counter;
+  }
+
+  @view({})
+  get_counter() {
+    return this.counter;
+  }
+
+  @call({})
+  increment() {
+    this.counter += 1;
+  }
+}
+
+export default Contract;`,
+    TypeScript: `// near-sdk-js state management (TypeScript)
+import { NearBindgen, view, call } from "near-sdk-js";
+
+@NearBindgen({})
+export class Contract {
+  counter: number = 0;
+
+  @view({})
+  get_counter(): number {
+    return this.counter;
+  }
+
+  @call({})
+  increment(): void {
+    this.counter += 1;
+  }
+}`,
+  },
+  'contract-structure': {
+    Rust: `use near_sdk::{near_bindgen, env, AccountId};
+use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
+
+#[near_bindgen]
+#[derive(BorshDeserialize, BorshSerialize)]
+pub struct Contract {
+    owner_id: AccountId,
+}
+
+impl Default for Contract {
+    fn default() -> Self {
+        Self {
+            owner_id: env::current_account_id(),
+        }
+    }
+}
+
+#[near_bindgen]
+impl Contract {
+    pub fn get_owner(&self) -> AccountId {
+        self.owner_id.clone()
+    }
+}`,
+    JavaScript: `// near-sdk-js contract structure (JavaScript)
+import { NearBindgen, view, near } from "near-sdk-js";
+
+@NearBindgen({})
+class Contract {
+  constructor({ owner_id } = { owner_id: near.currentAccountId() }) {
+    this.owner_id = owner_id;
+  }
+
+  @view({})
+  get_owner() {
+    return this.owner_id;
+  }
+}
+
+export default Contract;`,
+    TypeScript: `// near-sdk-js contract structure (TypeScript)
+import { NearBindgen, view, near } from "near-sdk-js";
+
+@NearBindgen({})
+export class Contract {
+  owner_id: string = near.currentAccountId();
+
+  @view({})
+  get_owner(): string {
+    return this.owner_id;
+  }
+}`,
+  },
+  'view-methods': {
+    Rust: `use near_sdk::near_bindgen;
+
+#[near_bindgen]
+#[derive(Default)]
+pub struct Contract {
+    greeting: String,
+}
+
+#[near_bindgen]
+impl Contract {
+    pub fn get_greeting(&self) -> String {
+        self.greeting.clone()
+    }
+
+    pub fn get_greeting_length(&self) -> u64 {
+        self.greeting.len() as u64
+    }
+}`,
+    JavaScript: `// near-sdk-js view methods (JavaScript)
+import { NearBindgen, view } from "near-sdk-js";
+
+@NearBindgen({})
+class Contract {
+  constructor({ greeting } = { greeting: "hello" }) {
+    this.greeting = greeting;
+  }
+
+  @view({})
+  get_greeting() {
+    return this.greeting;
+  }
+
+  @view({})
+  get_greeting_length() {
+    return this.greeting.length;
+  }
+}
+
+export default Contract;`,
+    TypeScript: `// near-sdk-js view methods (TypeScript)
+import { NearBindgen, view } from "near-sdk-js";
+
+@NearBindgen({})
+export class Contract {
+  greeting: string = "hello";
+
+  @view({})
+  get_greeting(): string {
+    return this.greeting;
+  }
+
+  @view({})
+  get_greeting_length(): number {
+    return this.greeting.length;
+  }
+}`,
+  },
+  'change-methods': {
+    Rust: `use near_sdk::near_bindgen;
+use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
+
+#[near_bindgen]
+#[derive(BorshDeserialize, BorshSerialize)]
+pub struct Contract {
+    greeting: String,
+}
+
+impl Default for Contract {
+    fn default() -> Self {
+        Self {
+            greeting: "hello".to_string(),
+        }
+    }
+}
+
+#[near_bindgen]
+impl Contract {
+    pub fn set_greeting(&mut self, greeting: String) {
+        self.greeting = greeting;
+    }
+
+    pub fn append_suffix(&mut self, suffix: String) {
+        self.greeting.push_str(&suffix);
+    }
+}`,
+    JavaScript: `// near-sdk-js change methods (JavaScript)
+import { NearBindgen, view, call, near } from "near-sdk-js";
+
+@NearBindgen({})
+class Contract {
+  constructor({ greeting } = { greeting: "hello" }) {
+    this.greeting = greeting;
+  }
+
+  @view({})
+  get_greeting() {
+    return this.greeting;
+  }
+
+  @call({})
+  set_greeting({ greeting }) {
+    near.log(\`Setting greeting to \${greeting}\`);
+    this.greeting = greeting;
+  }
+
+  @call({})
+  append_suffix({ suffix }) {
+    this.greeting = this.greeting + suffix;
+  }
+}
+
+export default Contract;`,
+    TypeScript: `// near-sdk-js change methods (TypeScript)
+import { NearBindgen, view, call, near } from "near-sdk-js";
+
+@NearBindgen({})
+export class Contract {
+  greeting: string = "hello";
+
+  @view({})
+  get_greeting(): string {
+    return this.greeting;
+  }
+
+  @call({})
+  set_greeting({ greeting }: { greeting: string }): void {
+    near.log(\`Setting greeting to \${greeting}\`);
+    this.greeting = greeting;
+  }
+
+  @call({})
+  append_suffix({ suffix }: { suffix: string }): void {
+    this.greeting = this.greeting + suffix;
+  }
+}`,
+  },
+  events: {
+    Rust: `use near_sdk::{near_bindgen, env};
+use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
+
+#[near_bindgen]
+#[derive(BorshDeserialize, BorshSerialize)]
+pub struct Contract {
+    message: String,
+}
+
+impl Default for Contract {
+    fn default() -> Self {
+        Self {
+            message: "initial".to_string(),
+        }
+    }
+}
+
+#[near_bindgen]
+impl Contract {
+    pub fn set_message(&mut self, message: String) {
+        env::log_str(&format!("EVENT_JSON:{{\"event\":\"MessageUpdated\",\"new_message\":\"{}\"}}", message));
+        self.message = message;
+    }
+}`,
+    JavaScript: `// near-sdk-js events (JavaScript) using structured logs
+import { NearBindgen, call, near } from "near-sdk-js";
+
+@NearBindgen({})
+class Contract {
+  constructor({ message } = { message: "initial" }) {
+    this.message = message;
+  }
+
+  @call({})
+  set_message({ message }) {
+    near.log(
+      JSON.stringify({
+        event: "MessageUpdated",
+        new_message: message,
+      }),
+    );
+    this.message = message;
+  }
+}
+
+export default Contract;`,
+    TypeScript: `// near-sdk-js events (TypeScript) using structured logs
+import { NearBindgen, call, near } from "near-sdk-js";
+
+@NearBindgen({})
+export class Contract {
+  message: string = "initial";
+
+  @call({})
+  set_message({ message }: { message: string }): void {
+    near.log(
+      JSON.stringify({
+        event: "MessageUpdated",
+        new_message: message,
+      }),
+    );
+    this.message = message;
+  }
+}`,
+  },
+  errors: {
+    Rust: `use near_sdk::{near_bindgen, env};
+
+#[near_bindgen]
+#[derive(Default)]
+pub struct Contract {}
+
+#[near_bindgen]
+impl Contract {
+    pub fn assert_positive(&self, value: i64) {
+        if value <= 0 {
+            env::panic_str("VALUE_MUST_BE_POSITIVE");
+        }
+    }
+
+    pub fn assert_owner(&self, account_id: String) {
+        assert_eq!(env::current_account_id().to_string(), account_id, "ONLY_OWNER");
+    }
+}`,
+    JavaScript: `// near-sdk-js error handling (JavaScript)
+import { NearBindgen, call, near } from "near-sdk-js";
+
+@NearBindgen({})
+class Contract {
+  @call({})
+  assert_positive({ value }) {
+    if (value <= 0) {
+      near.panic("VALUE_MUST_BE_POSITIVE");
+    }
+  }
+
+  @call({})
+  assert_caller({ expected_account }) {
+    if (near.predecessorAccountId() !== expected_account) {
+      near.panic("ONLY_EXPECTED_CALLER");
+    }
+  }
+}
+
+export default Contract;`,
+    TypeScript: `// near-sdk-js error handling (TypeScript)
+import { NearBindgen, call, near } from "near-sdk-js";
+
+@NearBindgen({})
+export class Contract {
+  @call({})
+  assert_positive({ value }: { value: number }): void {
+    if (value <= 0) {
+      near.panic("VALUE_MUST_BE_POSITIVE");
+    }
+  }
+
+  @call({})
+  assert_caller({ expected_account }: { expected_account: string }): void {
+    if (near.predecessorAccountId() !== expected_account) {
+      near.panic("ONLY_EXPECTED_CALLER");
+    }
+  }
+}`,
+  },
+  'gas-optimization': {
+    Rust: `use near_sdk::near_bindgen;
+use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
+
+#[near_bindgen]
+#[derive(BorshDeserialize, BorshSerialize)]
+pub struct Contract {
+    // Store only minimal data on-chain to save gas
+    counter: u64,
+}
+
+impl Default for Contract {
+    fn default() -> Self {
+        Self { counter: 0 }
+    }
+}
+
+#[near_bindgen]
+impl Contract {
+    pub fn bulk_increment(&mut self, times: u32) {
+        // Simple loop; in real code you should cap times to avoid out-of-gas
+        for _ in 0..times {
+            self.counter += 1;
+        }
+    }
+
+    pub fn get_counter(&self) -> u64 {
+        self.counter
+    }
+}`,
+    JavaScript: `// near-sdk-js gas optimization (JavaScript)
+import { NearBindgen, view, call } from "near-sdk-js";
+
+@NearBindgen({})
+class Contract {
+  constructor({ counter } = { counter: 0 }) {
+    this.counter = counter;
+  }
+
+  @view({})
+  get_counter() {
+    return this.counter;
+  }
+
+  @call({})
+  bulk_increment({ times }) {
+    // In production, always validate "times" to avoid excessive gas usage
+    for (let i = 0; i < times; i += 1) {
+      this.counter += 1;
+    }
+  }
+}
+
+export default Contract;`,
+    TypeScript: `// near-sdk-js gas optimization (TypeScript)
+import { NearBindgen, view, call } from "near-sdk-js";
+
+@NearBindgen({})
+export class Contract {
+  counter: number = 0;
+
+  @view({})
+  get_counter(): number {
+    return this.counter;
+  }
+
+  @call({})
+  bulk_increment({ times }: { times: number }): void {
+    for (let i = 0; i < times; i += 1) {
+      this.counter += 1;
+    }
+  }
+}`,
+  },
+  testing: {
+    Rust: `use near_sdk::near_bindgen;
+
+#[near_bindgen]
+#[derive(Default)]
+pub struct Contract {}
+
+#[near_bindgen]
+impl Contract {
+    pub fn add(&self, a: u64, b: u64) -> u64 {
+        a + b
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_add() {
+        let contract = Contract::default();
+        assert_eq!(contract.add(2, 3), 5);
+    }
+}`,
+    JavaScript: `// near-sdk-js testing example (JavaScript)
+// Contract code
+import { NearBindgen, view } from "near-sdk-js";
+
+@NearBindgen({})
+class Contract {
+  @view({})
+  add({ a, b }) {
+    return a + b;
+  }
+}
+
+export default Contract;`,
+    TypeScript: `// near-sdk-js testing example (TypeScript)
+import { NearBindgen, view } from "near-sdk-js";
+
+@NearBindgen({})
+export class Contract {
+  @view({})
+  add({ a, b }: { a: number; b: number }): number {
+    return a + b;
+  }
+}`,
+  },
 }
 
