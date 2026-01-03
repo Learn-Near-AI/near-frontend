@@ -1,6 +1,7 @@
 import React from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import ExampleCard from './ExampleCard'
+import { categoryOrder } from '../data/examples'
 
 function CategorySidebar({
   groupedExamples,
@@ -10,7 +11,18 @@ function CategorySidebar({
   handleExampleSelect,
   categoryIcons
 }) {
-  const categories = Object.keys(groupedExamples).sort()
+  // Sort categories by learning complexity order (Basics first)
+  const categories = Object.keys(groupedExamples).sort((a, b) => {
+    const indexA = categoryOrder.indexOf(a)
+    const indexB = categoryOrder.indexOf(b)
+    // If both are in the order list, sort by their position
+    if (indexA !== -1 && indexB !== -1) return indexA - indexB
+    // If only one is in the list, prioritize it
+    if (indexA !== -1) return -1
+    if (indexB !== -1) return 1
+    // If neither is in the list, sort alphabetically
+    return a.localeCompare(b)
+  })
 
   if (categories.length === 0) {
     return (

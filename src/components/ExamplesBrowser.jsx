@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react'
-import { examplesData, categoryIcons } from '../data/examples'
+import { examplesData, categoryIcons, categoryOrder, WORKING_EXAMPLES } from '../data/examples'
 import CategorySidebar from './CategorySidebar'
 import SearchBar from './SearchBar'
 import FiltersPanel from './FiltersPanel'
@@ -76,15 +76,13 @@ function ExamplesBrowser({ isDark, toggleTheme }) {
   }
 
   const handleExampleSelect = (example) => {
-    const indexInAll = allExamples.findIndex(e => e.id === example.id)
-
-    // Only the first 10 examples show the full learning interface
-    if (indexInAll !== -1 && indexInAll >= 10) {
-      setComingSoonExample(example)
-      setSelectedExample(null)
-    } else {
+    // Check if example has working code implementation
+    if (WORKING_EXAMPLES.includes(example.id)) {
       setSelectedExample(example)
       setComingSoonExample(null)
+    } else {
+      setComingSoonExample(example)
+      setSelectedExample(null)
     }
   }
 
@@ -93,7 +91,15 @@ function ExamplesBrowser({ isDark, toggleTheme }) {
     setComingSoonExample(null)
   }
 
-  const availableCategories = Object.keys(examplesData)
+  // Sort available categories by learning complexity order
+  const availableCategories = Object.keys(examplesData).sort((a, b) => {
+    const indexA = categoryOrder.indexOf(a)
+    const indexB = categoryOrder.indexOf(b)
+    if (indexA !== -1 && indexB !== -1) return indexA - indexB
+    if (indexA !== -1) return -1
+    if (indexB !== -1) return 1
+    return a.localeCompare(b)
+  })
   const availableDifficulties = ['All', 'Beginner', 'Intermediate', 'Advanced']
 
   return (
@@ -153,8 +159,7 @@ function ExamplesBrowser({ isDark, toggleTheme }) {
                   The full interactive learning interface for this example is coming soon.
                 </p>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  For now, try one of the first 10 examples to access the full{' '}
-                  <span className="font-medium">CODE EXAMPLE PAGE (Main Learning Interface)</span>.
+                  This example is currently under development. Check back soon!
                 </p>
               </div>
             </div>

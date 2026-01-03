@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { ChevronDown, Sun, Moon, Github, X } from 'lucide-react'
+import { categoryOrder } from '../data/examples'
 
 function FiltersPanel({
   selectedDifficulty,
@@ -93,7 +94,14 @@ function FiltersPanel({
         {isCategoryOpen && (
           <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-near-darker border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
             <div className="p-2">
-              {availableCategories.map(category => (
+              {availableCategories.sort((a, b) => {
+                const indexA = categoryOrder.indexOf(a)
+                const indexB = categoryOrder.indexOf(b)
+                if (indexA !== -1 && indexB !== -1) return indexA - indexB
+                if (indexA !== -1) return -1
+                if (indexB !== -1) return 1
+                return a.localeCompare(b)
+              }).map(category => (
                 <label
                   key={category}
                   className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer"
