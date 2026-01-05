@@ -1,10 +1,11 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { examplesData, categoryIcons, categoryOrder, WORKING_EXAMPLES } from '../data/examples'
 import CategorySidebar from './CategorySidebar'
 import SearchBar from './SearchBar'
 import FiltersPanel from './FiltersPanel'
 import WelcomeContent from './WelcomeContent'
 import ExampleDetail from './ExampleDetail'
+import SuccessPage from './SuccessPage'
 
 function ExamplesBrowser({ isDark, toggleTheme }) {
   const [selectedExample, setSelectedExample] = useState(null)
@@ -12,6 +13,7 @@ function ExamplesBrowser({ isDark, toggleTheme }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedDifficulty, setSelectedDifficulty] = useState('All')
   const [selectedCategories, setSelectedCategories] = useState([])
+  const [currentPath, setCurrentPath] = useState(() => window.location.pathname)
   const [expandedCategories, setExpandedCategories] = useState(() => {
     // Initialize all categories as collapsed by default
     return Object.keys(examplesData).reduce((acc, cat) => {
@@ -19,6 +21,38 @@ function ExamplesBrowser({ isDark, toggleTheme }) {
       return acc
     }, {})
   })
+
+  // Listen to path changes
+  useEffect(() => {
+    const handlePathChange = () => {
+      setCurrentPath(window.location.pathname)
+    }
+    
+    window.addEventListener('popstate', handlePathChange)
+    // Also check on mount and when path might change
+    const interval = setInterval(() => {
+      if (window.location.pathname !== currentPath) {
+        setCurrentPath(window.location.pathname)
+      }
+    }, 100)
+    
+    return () => {
+      window.removeEventListener('popstate', handlePathChange)
+      clearInterval(interval)
+    }
+  }, [currentPath])
+
+  // Handle transactionHashes URL parameter - redirect to success page
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const transactionHashes = urlParams.get('transactionHashes')
+    
+    if (transactionHashes && !window.location.pathname.includes('/success')) {
+      // Redirect to success page with transaction hash
+      window.history.replaceState({}, '', `/examples/success?transactionHashes=${transactionHashes}`)
+      window.location.href = `/examples/success?transactionHashes=${transactionHashes}`
+    }
+  }, [])
 
   // Flatten all examples for search
   const allExamples = useMemo(() => {
@@ -89,6 +123,13 @@ function ExamplesBrowser({ isDark, toggleTheme }) {
   const handleBackToBrowse = () => {
     setSelectedExample(null)
     setComingSoonExample(null)
+    // If on success page, navigate back to /examples
+    if (window.location.pathname.includes('/success')) {
+      // Remove /success from path and clean up URL params
+      const newPath = '/examples'
+      window.history.pushState({}, '', newPath)
+      setCurrentPath(newPath)
+    }
   }
 
   // Sort available categories by learning complexity order
@@ -141,7 +182,9 @@ function ExamplesBrowser({ isDark, toggleTheme }) {
 
         {/* Main Content Area - 80% width */}
         <div className="flex-1 bg-gray-50 dark:bg-near-darker">
-          {selectedExample ? (
+          {currentPath.includes('/success') ? (
+            <SuccessPage onBack={handleBackToBrowse} />
+          ) : selectedExample ? (
             <ExampleDetail example={selectedExample} onBack={handleBackToBrowse} />
           ) : comingSoonExample ? (
             <div className="p-8 max-w-3xl mx-auto">

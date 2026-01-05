@@ -9,7 +9,24 @@
   
   body {
     @apply bg-white dark:bg-near-darker text-gray-900 dark:text-gray-100 transition-colors duration-300;
-    font-family: 'Poppins', sans-serif;
+    font-family: 'Finlandica', sans-serif;
   }
+}
+
+@keyframes rotate-360 {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.rotate-slow {
+  animation: rotate-360 40s linear infinite;
+}
+
+.rotate-slower {
+  animation: rotate-360 30s linear infinite;
 }
 

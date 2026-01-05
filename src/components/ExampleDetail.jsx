@@ -35,6 +35,11 @@ function ExampleDetail({ example, onBack }) {
     `// No ${activeLanguage} code sample is available yet for "${example.name}".
 // Try switching language tabs, or pick another example from the sidebar.`
 
+  const addConsoleOutput = (message) => {
+    setConsoleOutput((prev) => prev + message + '\n')
+  }
+
+
   useEffect(() => {
     setCode(initialCode)
   }, [example.id, activeLanguage, initialCode])
@@ -67,9 +72,46 @@ function ExampleDetail({ example, onBack }) {
     }
   }, [example.id])
 
-  const addConsoleOutput = (message) => {
-    setConsoleOutput((prev) => prev + message + '\n')
-  }
+  // Handle transactionHashes URL parameter - redirect to success page
+  useEffect(() => {
+    // Check URL parameter on mount (for page reloads)
+    const urlParams = new URLSearchParams(window.location.search)
+    const transactionHashes = urlParams.get('transactionHashes')
+    
+    if (transactionHashes && !window.location.pathname.includes('/success')) {
+      // Redirect to success page with transaction hash
+      window.history.replaceState({}, '', `/examples/success?transactionHashes=${transactionHashes}`)
+      window.location.href = `/examples/success?transactionHashes=${transactionHashes}`
+    }
+  }, []) // Only run on mount
+
+  // Handle transactionHashes URL parameter - check continuously for new transactions and redirect
+  useEffect(() => {
+    const checkAndRedirect = () => {
+      const urlParams = new URLSearchParams(window.location.search)
+      const transactionHashes = urlParams.get('transactionHashes')
+      
+      if (transactionHashes && !window.location.pathname.includes('/success')) {
+        // Redirect to success page
+        window.history.replaceState({}, '', `/examples/success?transactionHashes=${transactionHashes}`)
+        window.location.href = `/examples/success?transactionHashes=${transactionHashes}`
+      }
+    }
+    
+    // Check immediately
+    checkAndRedirect()
+    
+    // Check periodically to catch URL changes
+    const interval = setInterval(checkAndRedirect, 500)
+    
+    // Listen to popstate events
+    window.addEventListener('popstate', checkAndRedirect)
+    
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('popstate', checkAndRedirect)
+    }
+  }, [])
 
   const clearConsole = () => {
     setConsoleOutput('')
@@ -195,6 +237,9 @@ function ExampleDetail({ example, onBack }) {
 
       const targetAccountId = accountExists ? contractId : accountIdCheck
       
+      // Store target account ID for retrieval after redirect
+      localStorage.setItem('pendingDeploymentAccountId', targetAccountId)
+      
       if (!accountExists) {
         addConsoleOutput(`ℹ️  Deploying to your account: ${targetAccountId}`)
         addConsoleOutput('   (To deploy to subaccount, create it first)')
@@ -225,6 +270,9 @@ function ExampleDetail({ example, onBack }) {
 
       setDeployedContractId(targetAccountId)
       setDeploymentTxHash(txHash)
+      
+      // Note: Modal will be shown after redirect via URL parameter handler
+      // The wallet redirects to external site, so we can't show modal here
     } catch (error) {
       addConsoleOutput(`❌ Error: ${error.message}`)
       console.error('Deploy error:', error)
