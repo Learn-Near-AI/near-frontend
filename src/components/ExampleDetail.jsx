@@ -9,7 +9,7 @@ import CodeEditor from './CodeEditor'
 import InfoPanel from './InfoPanel'
 import ConsolePanel from './ConsolePanel'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://near-by-example-backend.fly.dev'
 
 function ExampleDetail({ example, onBack }) {
   const [activeLanguage, setActiveLanguage] = useState(example.language || 'Rust')
@@ -134,10 +134,15 @@ function ExampleDetail({ example, onBack }) {
         body: JSON.stringify({ code, language: activeLanguage }),
       })
 
+      if (!compileResponse.ok) {
+        const errorData = await compileResponse.json().catch(() => ({ error: 'Unknown error' }))
+        throw new Error(errorData.error || errorData.message || `HTTP ${compileResponse.status}: ${compileResponse.statusText}`)
+      }
+
       const compileResult = await compileResponse.json()
 
-      if (!compileResponse.ok) {
-        throw new Error(compileResult.error || 'Compilation failed')
+      if (!compileResult.success && compileResult.stderr) {
+        throw new Error(compileResult.stderr || compileResult.error || 'Compilation failed')
       }
 
       addConsoleOutput('✓ Contract compiled successfully')
@@ -145,7 +150,14 @@ function ExampleDetail({ example, onBack }) {
       addConsoleOutput('\n💡 Note: Full execution requires deployment.')
       addConsoleOutput('   Click "Deploy" to deploy and test your contract on TestNet.')
     } catch (error) {
-      addConsoleOutput(`❌ Error: ${error.message}`)
+      if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        addConsoleOutput(`❌ Error: Failed to connect to backend`)
+        addConsoleOutput(`   Backend URL: ${API_BASE_URL}`)
+        addConsoleOutput(`   Please check if the backend is running and accessible.`)
+        addConsoleOutput(`   Error details: ${error.message}`)
+      } else {
+        addConsoleOutput(`❌ Error: ${error.message}`)
+      }
       console.error('Run error:', error)
     } finally {
       setIsRunning(false)
@@ -176,10 +188,15 @@ function ExampleDetail({ example, onBack }) {
         body: JSON.stringify({ code, language: activeLanguage }),
       })
 
+      if (!compileResponse.ok) {
+        const errorData = await compileResponse.json().catch(() => ({ error: 'Unknown error' }))
+        throw new Error(errorData.error || errorData.message || `HTTP ${compileResponse.status}: ${compileResponse.statusText}`)
+      }
+
       const compileResult = await compileResponse.json()
 
-      if (!compileResponse.ok) {
-        throw new Error(compileResult.error || 'Compilation failed')
+      if (!compileResult.success && compileResult.stderr) {
+        throw new Error(compileResult.stderr || compileResult.error || 'Compilation failed')
       }
 
       addConsoleOutput('✓ Contract compiled successfully')
@@ -274,7 +291,14 @@ function ExampleDetail({ example, onBack }) {
       // Note: Modal will be shown after redirect via URL parameter handler
       // The wallet redirects to external site, so we can't show modal here
     } catch (error) {
-      addConsoleOutput(`❌ Error: ${error.message}`)
+      if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        addConsoleOutput(`❌ Error: Failed to connect to backend`)
+        addConsoleOutput(`   Backend URL: ${API_BASE_URL}`)
+        addConsoleOutput(`   Please check if the backend is running and accessible.`)
+        addConsoleOutput(`   Error details: ${error.message}`)
+      } else {
+        addConsoleOutput(`❌ Error: ${error.message}`)
+      }
       console.error('Deploy error:', error)
     } finally {
       setIsDeploying(false)
