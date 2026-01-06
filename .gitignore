@@ -48,6 +48,6 @@ backend/test-*.js
 
 # Cloudflare
 wrangler.jsonc
-wrangler.toml
+# wrangler.toml - needed for deployment
 functions/
-_redirects
+# _redirects - needed for SPA routing
