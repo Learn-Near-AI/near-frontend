@@ -1,2 +1,6 @@
-/*    /index.html   200
+# Cloudflare Pages redirects - redirect all routes to index.html
+# Exclude files with extensions and index.html itself
+/404.html    /index.html   200
+/examples    /index.html   200
+/examples/*    /index.html   200
 

@@ -49,5 +49,5 @@ backend/test-*.js
 # Cloudflare
 wrangler.jsonc
 # wrangler.toml - needed for deployment
-functions/
+# functions/ - needed for Cloudflare Pages middleware
 # _redirects - needed for SPA routing
