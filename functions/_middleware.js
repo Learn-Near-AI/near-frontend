@@ -11,16 +11,19 @@ export function onRequest(context) {
   // Don't rewrite if:
   // 1. It's a static file (has extension)
   // 2. It's already index.html
-  // 3. It's the root path
-  // 4. It's in the /assets/ directory (static assets)
+  // 3. It's in the /assets/ directory (static assets)
   if (hasExtension || 
       pathname === '/index.html' || 
-      pathname === '/' ||
       pathname.startsWith('/assets/')) {
     return context.next();
   }
   
+  // Preserve query parameters and hash when rewriting (important for wallet redirects!)
+  const newUrl = new URL('/index.html', context.request.url);
+  newUrl.search = url.search; // Preserve query parameters (e.g., ?transactionHashes=...)
+  newUrl.hash = url.hash; // Preserve hash if any
+  
   // Rewrite all other routes to index.html for SPA routing
-  return context.rewrite(new URL('/index.html', context.request.url));
+  return context.rewrite(newUrl);
 }
 

@@ -93,6 +93,17 @@ function App() {
   }, [])
 
   useEffect(() => {
+    // Handle initial URL with query parameters (e.g., from wallet redirect)
+    const urlParams = new URLSearchParams(window.location.search)
+    const transactionHashes = urlParams.get('transactionHashes')
+    
+    // If we have transactionHashes and we're not on the examples path, ensure we're on examples
+    if (transactionHashes && !currentPath.startsWith('/examples')) {
+      const newPath = `/examples${window.location.search}`
+      window.history.replaceState({}, '', newPath)
+      setCurrentPath('/examples')
+    }
+    
     const handlePopState = () => {
       setCurrentPath(window.location.pathname || '/')
     }

@@ -15,5 +15,6 @@ export default defineConfig({
   optimizeDeps: {
     include: ['buffer', 'near-api-js'],
   },
+  publicDir: 'public', // Ensure public directory is copied (includes _redirects file)
 })
 
