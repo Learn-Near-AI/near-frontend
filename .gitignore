@@ -45,3 +45,9 @@ out/
 # Test scripts
 test-*.js
 backend/test-*.js
+
+# Cloudflare
+wrangler.jsonc
+wrangler.toml
+functions/
+_redirects
