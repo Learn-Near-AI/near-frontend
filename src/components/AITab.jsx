@@ -9,15 +9,18 @@ function AITab({ code, example, activeLanguage }) {
   const [isLoading, setIsLoading] = useState(false)
   const messagesEndRef = useRef(null)
 
-  // Get API key - try environment variable first, then fallback
-  const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || 'AIzaSyBKKgDl1L3m3gZNAB9pDfPjdI3Wxc3rzJA'
+  // Get API key from environment variable (required for security)
+  const API_KEY = import.meta.env.VITE_GEMINI_API_KEY
+  
+  // Validate API key is configured
+  if (!API_KEY) {
+    console.error('VITE_GEMINI_API_KEY environment variable is not set')
+  }
   
   // Initialize Gemini AI client
-  // The client reads from GEMINI_API_KEY environment variable
-  // For browser usage, we'll set it via import.meta.env or pass directly if supported
-  const ai = new GoogleGenAI({
+  const ai = API_KEY ? new GoogleGenAI({
     apiKey: API_KEY
-  })
+  }) : null
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -38,6 +41,15 @@ function AITab({ code, example, activeLanguage }) {
 
   const handleAskAI = async () => {
     if (!question.trim() || isLoading) return
+
+    // Check if API key is configured
+    if (!API_KEY || !ai) {
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: '⚠️ AI feature is not configured. Please set VITE_GEMINI_API_KEY environment variable.'
+      }])
+      return
+    }
 
     const userQuestion = question.trim()
     setQuestion('')

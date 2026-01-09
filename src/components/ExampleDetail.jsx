@@ -11,6 +11,12 @@ import ConsolePanel from './ConsolePanel'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://near-by-example-backend.fly.dev'
 
+// Helper function to determine deployment method based on language
+const shouldUseCLIDeployment = (language) => {
+  // Use CLI deployment for Rust, wallet for JavaScript/TypeScript
+  return language === 'Rust'
+}
+
 function ExampleDetail({ example, onBack }) {
   const [activeLanguage, setActiveLanguage] = useState('JavaScript')
   const [activeInfoTab, setActiveInfoTab] = useState('ai')
@@ -23,6 +29,7 @@ function ExampleDetail({ example, onBack }) {
   const [testResults, setTestResults] = useState({})
   const [testParams, setTestParams] = useState({})
   const [isTesting, setIsTesting] = useState(false)
+  const [backendCLIConfigured, setBackendCLIConfigured] = useState(null)
   const [contractState, setContractState] = useState({
     counter: 0,
     message: 'Hello, NEAR storage!',
@@ -80,6 +87,25 @@ function ExampleDetail({ example, onBack }) {
   // Reset deploying state on mount (in case user navigated away and came back)
   useEffect(() => {
     setIsDeploying(false)
+  }, [])
+
+  // Check backend CLI configuration status
+  useEffect(() => {
+    const checkBackendStatus = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/near/status`)
+        if (response.ok) {
+          const status = await response.json()
+          setBackendCLIConfigured(status.configured)
+          console.log('Backend CLI configured:', status.configured)
+        }
+      } catch (error) {
+        console.warn('Could not check backend CLI status:', error)
+        setBackendCLIConfigured(false)
+      }
+    }
+    
+    checkBackendStatus()
   }, [])
 
   // Handle transactionHashes URL parameter - redirect to success page
@@ -193,6 +219,160 @@ function ExampleDetail({ example, onBack }) {
       return
     }
 
+    // Check if we should use CLI or wallet deployment
+    const useCLI = shouldUseCLIDeployment(activeLanguage)
+
+    if (useCLI) {
+      // Use backend CLI deployment for Rust
+      await handleCLIDeploy()
+    } else {
+      // Use wallet deployment for JavaScript/TypeScript
+      await handleWalletDeploy()
+    }
+  }
+
+  // CLI deployment for Rust contracts
+  const handleCLIDeploy = async () => {
+    setIsDeploying(true)
+    clearConsole()
+    addConsoleOutput('▶ Starting CLI deployment (Rust contract)...')
+    addConsoleOutput('📋 Deployment Method: NEAR CLI (Backend)')
+    addConsoleOutput('   No wallet connection required\n')
+    addConsoleOutput('▶ Compiling contract...')
+
+    try {
+      // Step 1: Compile the contract
+      const compileResponse = await fetch(`${API_BASE_URL}/api/compile`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, language: activeLanguage }),
+      })
+
+      if (!compileResponse.ok) {
+        const errorData = await compileResponse.json().catch(() => ({ error: 'Unknown error' }))
+        throw new Error(errorData.error || errorData.message || `HTTP ${compileResponse.status}`)
+      }
+
+      const compileResult = await compileResponse.json()
+
+      if (!compileResult.success) {
+        throw new Error(compileResult.stderr || compileResult.error || 'Compilation failed')
+      }
+
+      addConsoleOutput('✓ Contract compiled successfully')
+      addConsoleOutput(`✓ WASM size: ${(compileResult.size / 1024).toFixed(2)} KB`)
+      if (compileResult.compilation_time) {
+        addConsoleOutput(`✓ Compilation time: ${compileResult.compilation_time}s`)
+      }
+
+      // Step 2: Deploy using backend NEAR CLI
+      addConsoleOutput('\n▶ Deploying via NEAR CLI...')
+      addConsoleOutput('   (Using backend deployment account)')
+
+      const deployResponse = await fetch(`${API_BASE_URL}/api/deploy`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          wasmBase64: compileResult.wasm,
+          initMethod: 'new',
+          initArgs: {}
+        }),
+      })
+
+      if (!deployResponse.ok) {
+        const errorData = await deployResponse.json().catch(() => ({ error: 'Deployment failed' }))
+        
+        // Check if CLI is not configured
+        if (deployResponse.status === 503) {
+          addConsoleOutput('❌ Backend NEAR CLI not configured')
+          addConsoleOutput('   The backend needs NEAR_ACCOUNT_ID and NEAR_PRIVATE_KEY')
+          addConsoleOutput('   Contact the administrator to enable CLI deployments')
+          throw new Error('Backend NEAR CLI not configured')
+        }
+        
+        throw new Error(errorData.error || 'Deployment failed')
+      }
+
+      const deployResult = await deployResponse.json()
+
+      if (!deployResult.success) {
+        throw new Error(deployResult.error || 'Deployment failed')
+      }
+
+      addConsoleOutput('✓ Contract deployed successfully!')
+      addConsoleOutput(`✓ Contract ID: ${deployResult.contractId}`)
+      addConsoleOutput(`✓ Transaction hash: ${deployResult.transactionHash}`)
+      addConsoleOutput(`✓ Network: ${deployResult.network}`)
+      if (deployResult.deploymentTime) {
+        addConsoleOutput(`✓ Deployment time: ${deployResult.deploymentTime}s`)
+      }
+      
+      if (deployResult.explorerUrl) {
+        addConsoleOutput(`\n🔗 View in Explorer:`)
+        addConsoleOutput(`   ${deployResult.explorerUrl}`)
+      }
+      if (deployResult.accountUrl) {
+        addConsoleOutput(`\n🔗 View Account:`)
+        addConsoleOutput(`   ${deployResult.accountUrl}`)
+      }
+
+      setDeployedContractId(deployResult.contractId)
+      setDeploymentTxHash(deployResult.transactionHash)
+
+      // Optional: Test the deployed contract
+      addConsoleOutput('\n▶ Testing deployed contract...')
+      try {
+        const testResponse = await fetch(`${API_BASE_URL}/api/contract/view`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contractAccountId: deployResult.contractId,
+            methodName: 'hello_world',
+            args: {}
+          }),
+        })
+
+        if (testResponse.ok) {
+          const testResult = await testResponse.json()
+          if (testResult.success) {
+            addConsoleOutput(`✓ Test call successful: ${JSON.stringify(testResult.result)}`)
+          }
+        }
+      } catch (testError) {
+        // Ignore test errors - deployment was successful
+        console.warn('Test call failed:', testError)
+      }
+
+      // Store contract ID for success page (same as wallet deployment)
+      if (deployResult.transactionHash) {
+        localStorage.setItem('pendingDeploymentAccountId', deployResult.contractId)
+        
+        // Navigate to success page (same as wallet deployment)
+        addConsoleOutput('\n▶ Redirecting to success page...')
+        
+        // Small delay to allow user to see the console output
+        setTimeout(() => {
+          window.history.replaceState({}, '', `/examples/success?transactionHashes=${deployResult.transactionHash}`)
+          window.location.href = `/examples/success?transactionHashes=${deployResult.transactionHash}`
+        }, 1500)
+      }
+
+    } catch (error) {
+      if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        addConsoleOutput(`❌ Error: Failed to connect to backend`)
+        addConsoleOutput(`   Backend URL: ${API_BASE_URL}`)
+        addConsoleOutput(`   Please check if the backend is running and accessible.`)
+      } else {
+        addConsoleOutput(`❌ Error: ${error.message}`)
+      }
+      console.error('CLI Deploy error:', error)
+    } finally {
+      setIsDeploying(false)
+    }
+  }
+
+  // Wallet deployment for JavaScript/TypeScript contracts
+  const handleWalletDeploy = async () => {
     const accountId = await getActiveAccountId()
     if (!accountId) {
       addConsoleOutput('❌ Error: Please connect your wallet first')
@@ -201,7 +381,9 @@ function ExampleDetail({ example, onBack }) {
 
     setIsDeploying(true)
     clearConsole()
-    addConsoleOutput('▶ Starting deployment process...')
+    addConsoleOutput('▶ Starting wallet deployment (JavaScript contract)...')
+    addConsoleOutput('📋 Deployment Method: MyNearWallet')
+    addConsoleOutput('   Deploying to your connected account\n')
     addConsoleOutput('▶ Compiling contract...')
 
     try {
@@ -353,7 +535,7 @@ function ExampleDetail({ example, onBack }) {
       } else {
         addConsoleOutput(`❌ Error: ${error.message}`)
       }
-      console.error('Deploy error:', error)
+      console.error('Wallet Deploy error:', error)
     } finally {
       setIsDeploying(false)
     }
@@ -538,6 +720,35 @@ function ExampleDetail({ example, onBack }) {
 
       <ExampleHeader example={example} activeLanguage={activeLanguage} />
 
+      {/* Backend CLI Status Warning */}
+      {activeLanguage === 'Rust' && backendCLIConfigured === false && (
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <span className="text-yellow-600 dark:text-yellow-500 text-xl">⚠️</span>
+            <div className="flex-1">
+              <h3 className="font-semibold text-yellow-800 dark:text-yellow-300 mb-1">
+                Backend CLI Deployment Not Configured
+              </h3>
+              <p className="text-sm text-yellow-700 dark:text-yellow-400">
+                Rust contracts require backend deployment via NEAR CLI. The backend is not currently configured with deployment credentials.
+                You can still compile and test the code, but deployment is disabled.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeLanguage === 'Rust' && backendCLIConfigured === true && (
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+          <div className="flex items-start gap-2">
+            <span className="text-blue-600 dark:text-blue-400 text-lg">ℹ️</span>
+            <p className="text-sm text-blue-700 dark:text-blue-300">
+              <strong>Rust contracts</strong> will be deployed via backend NEAR CLI. No wallet connection required.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col lg:flex-row gap-6">
         <CodeEditor
           code={code}
@@ -550,6 +761,7 @@ function ExampleDetail({ example, onBack }) {
           onDeploy={handleDeploy}
           onCopy={handleCopyCode}
           onReset={handleResetCode}
+          backendCLIConfigured={backendCLIConfigured}
         />
 
         <InfoPanel

@@ -12,7 +12,9 @@ function CodeEditor({
   onDeploy,
   onCopy,
   onReset,
+  backendCLIConfigured,
 }) {
+  const deploymentMethod = activeLanguage === 'Rust' ? 'CLI' : 'Wallet'
   return (
     <div className="lg:basis-3/5 bg-white dark:bg-near-dark rounded-xl border border-gray-200 dark:border-gray-800 flex flex-col overflow-hidden">
       {/* Top toolbar */}
@@ -77,8 +79,9 @@ function CodeEditor({
         </button>
         <button
           onClick={onDeploy}
-          disabled={isRunning || isDeploying}
+          disabled={isRunning || isDeploying || (activeLanguage === 'Rust' && backendCLIConfigured === false)}
           className="px-2.5 md:px-3 py-1.5 text-[0.65rem] md:text-xs border border-gray-300 dark:border-gray-600 rounded-lg text-gray-800 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-800 inline-flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+          title={activeLanguage === 'Rust' && backendCLIConfigured === false ? 'Backend CLI not configured' : `Deploy via ${deploymentMethod}`}
         >
           {isDeploying ? (
             <>
@@ -88,7 +91,7 @@ function CodeEditor({
           ) : (
             <>
               <Rocket className="h-4 w-4" />
-              Deploy
+              Deploy ({deploymentMethod})
             </>
           )}
         </button>

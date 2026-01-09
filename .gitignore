@@ -51,3 +51,11 @@ wrangler.jsonc
 # wrangler.toml - needed for deployment
 # functions/ - needed for Cloudflare Pages middleware
 # _redirects - needed for SPA routing
+
+# Implementation documentation (temporary development files)
+DEPLOYMENT-METHODS.md
+IMPLEMENTATION-SUMMARY.md
+QUICK-START.md
+DEPLOYMENT-FLOW.txt
+CLI-SUCCESS-PAGE-UPDATE.md
+SETUP-ENV.md
