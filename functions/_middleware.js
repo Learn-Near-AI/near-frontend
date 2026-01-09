@@ -1,4 +1,4 @@
-export function onRequest(context) {
+export async function onRequest(context) {
   const url = new URL(context.request.url);
   const pathname = url.pathname;
   
@@ -18,12 +18,12 @@ export function onRequest(context) {
     return context.next();
   }
   
-  // Preserve query parameters and hash when rewriting (important for wallet redirects!)
-  const newUrl = new URL('/index.html', context.request.url);
-  newUrl.search = url.search; // Preserve query parameters (e.g., ?transactionHashes=...)
-  newUrl.hash = url.hash; // Preserve hash if any
+  // For all other routes, serve index.html (SPA routing)
+  // Preserve query parameters and hash (important for wallet redirects!)
+  const indexUrl = new URL('/index.html', url.origin);
+  indexUrl.search = url.search; // Preserve query parameters (e.g., ?transactionHashes=...)
   
-  // Rewrite all other routes to index.html for SPA routing
-  return context.rewrite(newUrl);
+  // Fetch index.html from the assets
+  return context.env.ASSETS.fetch(indexUrl);
 }
 
